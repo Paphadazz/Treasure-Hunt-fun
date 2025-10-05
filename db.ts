@@ -32,7 +32,7 @@ export async function showAllScores(db: any) {
     type ScoreRow = { id: number; name: string; score: number; isLeader: number };
     const rows: ScoreRow[] = await db.all("SELECT * FROM scores");
     console.table(rows.map((r: ScoreRow) => ({
-        Name: r.name + (r.isLeader ? " 👑 (Leader)" : ""),
+        Name: r.name + (r.isLeader ? " (Leader)" : ""),
         Score: r.score,
         Leader: r.isLeader ? "✅" : ""
     })));
