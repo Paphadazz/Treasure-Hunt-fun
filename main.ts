@@ -1,51 +1,83 @@
 import { PlayerManager } from "./player";
 import { initDB } from "./db";
-import { showLobby } from "./lobby";
-import { startGame } from "./game";
-import prompt from 'prompt-sync';
+import { MathGame } from "./game";
+import prompt from "prompt-sync";
 
 const inputPrompt = prompt({ sigint: true });
-const MAX_PLAYERS = 3;
-const playerManager = new PlayerManager(MAX_PLAYERS);
 
-async function main() {
-    const db = await initDB();
+export class TreasureHuntGame {
+    private playerManager: PlayerManager;
+    private mathGame: MathGame;
+    private db: any;
+    private MAX_PLAYERS = 3;
 
-    console.log("=== Welcome to Treasure Hunt Game! ===");
+    constructor(db: any) {
+        this.db = db;
+        this.playerManager = new PlayerManager(this.MAX_PLAYERS);
+        this.mathGame = new MathGame(this.playerManager, this.db);
+    }
 
-    while (true) {
-        console.log("\nOptions: [join] Join Game | [start] Start Game | [exit] Leave Lobby | [view-score] Show Scores");
-        const input = inputPrompt("Enter your choice: ").trim().toLowerCase();
+    async run() {
+        console.log("=== Welcome to Treasure Hunt Game! ===");
 
-        if (input === 'join') {
-            const name = inputPrompt("Enter your player name: ").trim();
-            const player = playerManager.addPlayer(name);
-            if (!player) console.log("Lobby is full!");
-            else console.log(`${name} has joined the lobby!`);
-            showLobby(playerManager);
+        while (true) {
+            this.showLobby();
+            console.log("\nOptions: [join] Join Game | [start] Start Game | [exit] Leave Lobby | [view-score] Show Scores");
+            const choice = inputPrompt("Enter your choice: ").trim().toLowerCase();
 
-        } else if (input === 'start') {
-            if (playerManager.getPlayers().length === 0) {
-                console.log("No players in the lobby. Cannot start game!");
-            } else {
-                await startGame(playerManager, db); // เริ่มเกม และวนจบเกม
-                console.log("\nGame round finished. Back to lobby.");
-                showLobby(playerManager);
+            switch(choice) {
+                case "join": this.handleJoin(); break;
+                case "start": await this.handleStart(); break;
+                case "exit": this.handleExit(); break;
+                case "view-score": await this.handleViewScores(); break;
+                default: console.log("Invalid choice, please try again!");
             }
-
-        } else if (input === 'exit') {
-            const name = inputPrompt("Enter the name of player leaving: ").trim();
-            playerManager.removePlayer(name);
-            console.log(`${name} has left the lobby.`);
-            showLobby(playerManager);
-
-        } else if (input === 'view-scores') {
-            await import("./db").then(dbModule => dbModule.showAllScores(db));
-
-        } else {
-            console.log("Invalid choice, please try again!");
         }
     }
+
+    private showLobby() {
+        console.log("\n=== Lobby ===");
+        const players = this.playerManager.getPlayers();
+        if (players.length === 0) console.log("No players in the lobby yet.");
+        else {
+            players.forEach(p => console.log(p.isLeader ? `👑 ${p.name} (Leader)` : `- ${p.name}`));
+        }
+        console.log("================\n");
+    }
+
+    private handleJoin() {
+        const name = inputPrompt("Enter your player name: ").trim();
+        const player = this.playerManager.addPlayer(name);
+        if (!player) console.log("Lobby is full!");
+        else console.log(`${name} has joined the lobby!`);
+    }
+
+    private handleExit() {
+        const name = inputPrompt("Enter the name of player leaving: ").trim();
+        this.playerManager.removePlayer(name);
+        console.log(`${name} has left the lobby.`);
+    }
+
+    private async handleStart() {
+        if (this.playerManager.getPlayers().length === 0) {
+            console.log("No players in the lobby. Cannot start game!");
+            return;
+        }
+        await this.mathGame.start();
+        console.log("\nGame round finished. Back to lobby.");
+    }
+
+    private async handleViewScores() {
+        const dbModule = await import("./db");
+        await dbModule.showAllScores(this.db);
+    }
+}
+
+// main function
+async function main() {
+    const db = await initDB();
+    const game = new TreasureHuntGame(db);
+    await game.run();
 }
 
 main();
